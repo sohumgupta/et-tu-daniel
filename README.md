@@ -1,2 +1,2 @@
 # et-tu-daniel
-pwoject fo dl
+final project for csci 1470
