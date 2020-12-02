@@ -41,18 +41,28 @@ class Model(tf.keras.Model):
 		return tf.math.add(tf.math.multiply(g, decoder_probs), tf.math.multiply((1-g), pointer_probs))
         #need to add attention and pointer stuff
 
-    def build_ptr_prob(self, num_sentences, encoder_input, betas):
+    def build_ptr_prob(self, num_sentences, words_in_sentence, encoder_input, betas):
         #num_sentences, words_in_sentence
         #num_sentences, words_in_sentence
         #num_sentences, 1, vocab_size
-        p_t_ptr = tf.zeros([num_sentences, 1, self.vocab_size])
+        index_mult = np.arange(num_sentences).reshape((-1, 1))
+        index_mult_repeated = np.repeat(index_mult, words_in_sentence, axis=1)
 
-        for i in range(num_sentences):
-            for j in range(words_in_sentence):
-                vocab_index = encoder_input[i, j]
-                p_t_ptr[i, 1, vocab_index] = betas[i, j] 
+        encoder_indices = encoder_input.numpy()
+        indices  = encoder_indices * index_mult_repeated
+
+        p_t_ptr = np.zeros([num_sentences, 1, self.vocab_size])
+
+        np.put(p_t_ptr, indices, betas.flatten())
+
+        # p_t_ptr = np.zeros([num_sentences, 1, self.vocab_size])
         
-        return p_t_ptr
+        # for i in range(num_sentences):
+        #     for j in range(words_in_sentence):
+        #         vocab_index = encoder_input[i, j]
+        #         p_t_ptr[i, 1, vocab_index] = betas[i, j] 
+        
+        return tf.convert_to_tensor(p_t_ptr)
 
     def call_with_pointer(self, encoder_input, decoder_input):
         num_sentences = encoder_input.shape[0]
@@ -97,6 +107,7 @@ class Model(tf.keras.Model):
 
             betas = a[:, 0:num_words_in_sentence]
             gs = a[:, num_words_in_sentence]
+            #tf.subtract
             one_minus_g = tf.ones([num_sentences, 1]) - gs
 
             p_t_ptr = build_ptr_prob(num_sentences, encoder_input, betas)
