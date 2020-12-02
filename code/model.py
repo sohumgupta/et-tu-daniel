@@ -127,7 +127,7 @@ class Model(tf.keras.Model):
 		return probs
         #need to add attention and pointer stuff
 
-	def cross_entropy_loss_function(self, prbs, labels):
+	def loss_function(self, prbs, labels):
 		return tf.reduce_sum(tf.keras.losses.sparse_categorical_crossentropy(labels, prbs))
 
     def bleu_score(self, references, candidates):

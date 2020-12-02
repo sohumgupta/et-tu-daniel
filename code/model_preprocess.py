@@ -17,7 +17,7 @@ def get_sentences(file_path):
 		sentences.append(sentence)
 	return sentences, max_length
 
-def preprocess(modern, original, modern_test, original_test):
+def preprocess(modern_train, original_train, modern_test, original_test):
 	# train
 	modern_train_sentences, modern_train_length = get_sentences(modern_train)
 	original_train_sentences, original_train_length = get_sentences(original_train)
@@ -39,6 +39,6 @@ def preprocess(modern, original, modern_test, original_test):
 	modern_vocab, modern_idx = construct_vocab(modern_train_sentences)
 	original_vocab, original_idx = construct_vocab(original_train_sentences)
 
-
+	return modern_train_sentences, original_train_sentences, modern_test_sentences, original_test_sentences
 # get_data("../data/test_modern.txt", "../data/test_original.txt")
 
