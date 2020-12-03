@@ -6,6 +6,7 @@ from os import listdir
 from os.path import isfile, join
 from tqdm import tqdm
 from word2vec import Word2Vec
+import io
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 def get_training_data(sentences, vocab_size, negative_samples, window_size):
@@ -54,7 +55,7 @@ def train_embeddings():
 	VOCAB_SIZE = len(word2int)
 	SENTENCE_LENGTH = max_length
 	WINDOW_SIZE = 2
-	NEGATIVE_SAMPLES = 10
+	NEGATIVE_SAMPLES = 100
 
 	print(f"Generating training data...")
 	targets, contexts, labels = get_training_data(
@@ -65,7 +66,7 @@ def train_embeddings():
 	print(f"Number of Training Examples: {len(labels)}")
 
 	BATCH_SIZE = 1000
-	NUM_EPOCHS = 5
+	NUM_EPOCHS = 25
 
 	dataset = tf.data.Dataset.from_tensor_slices(((targets, contexts), labels))
 	dataset = dataset.shuffle(VOCAB_SIZE).batch(BATCH_SIZE, drop_remainder=True)
@@ -76,3 +77,37 @@ def train_embeddings():
 	word2vec.fit(dataset, epochs=NUM_EPOCHS, callbacks=[tensorboard_callback])
 
 	return word2vec.get_layer('target_embeddings').get_weights()[0], word2int, int2word
+
+def find_closest_words(embeddings, word2int, names, word, NUM_WORDS=10):
+	word_ind = word2int[word]
+	word_embedding = embeddings[word_ind]
+	word_embedding = np.reshape(word_embedding, (1, -1))
+
+	normed_embeddings = tf.math.l2_normalize(embeddings, axis=1)
+	normed_word = tf.math.l2_normalize(word_embedding, axis=1)
+
+	similarities = tf.matmul(normed_word, tf.transpose(normed_embeddings, [1, 0]))
+	best_words = np.argsort(-similarities[0])[:NUM_WORDS]
+
+	print(f"words most similar to \"{word}\"")
+	print("--")
+	for (i, word) in enumerate(best_words):
+		print(f"{i + 1}. {names[word]}")
+	print()
+
+def read_embeddings(embeddings_path):
+	embeddings = np.loadtxt(join(embeddings_path, 'embeddings.tsv'), dtype=np.float32, delimiter='\t', converters=None) 
+	names = np.loadtxt(join(embeddings_path, 'names.tsv'), dtype=np.unicode_, delimiter='\t', converters=None) 
+
+	return embeddings, names
+
+def write_embeddings(embeddings, word2int, embeddings_path):
+	embeddings_file = io.open(join(embeddings_path, 'embeddings.tsv'), 'w', encoding='utf-8')
+	names_file = io.open(join(embeddings_path, 'names.tsv'), 'w', encoding='utf-8')
+
+	for word, index in word2int.items():
+		embedding = embeddings[index] 
+		embeddings_file.write('\t'.join([str(x) for x in embedding]) + "\n")
+		names_file.write(word + "\n")
+	embeddings_file.close()
+	names_file.close()

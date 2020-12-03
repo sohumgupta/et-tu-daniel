@@ -8,41 +8,7 @@ from os.path import isfile, join
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 import io
 
-from embeddings import train_embeddings
-
-def find_closest_words(embeddings, word2int, names, word, NUM_WORDS=10):
-	word_ind = word2int[word]
-	word_embedding = embeddings[word_ind]
-	word_embedding = np.reshape(word_embedding, (1, -1))
-
-	normed_embeddings = tf.math.l2_normalize(embeddings, axis=1)
-	normed_word = tf.math.l2_normalize(word_embedding, axis=1)
-
-	similarities = tf.matmul(normed_word, tf.transpose(normed_embeddings, [1, 0]))
-	best_words = np.argsort(-similarities[0])[:NUM_WORDS]
-
-	print(f"words most similar to \"{word}\"")
-	print("--")
-	for (i, word) in enumerate(best_words):
-		print(f"{i + 1}. {names[word]}")
-	print()
-
-def read_embeddings(embeddings_path):
-	embeddings = np.loadtxt(join(embeddings_path, 'embeddings.tsv'), dtype=np.float32, delimiter='\t', converters=None) 
-	names = np.loadtxt(join(embeddings_path, 'names.tsv'), dtype=np.unicode_, delimiter='\t', converters=None) 
-
-	return embeddings, names
-
-def write_embeddings(embeddings, word2int, embeddings_path):
-	embeddings_file = io.open(join(embeddings_path, 'embeddings.tsv'), 'w', encoding='utf-8')
-	names_file = io.open(join(embeddings_path, 'names.tsv'), 'w', encoding='utf-8')
-
-	for word, index in word2int.items():
-		embedding = embeddings[index] 
-		embeddings_file.write('\t'.join([str(x) for x in embedding]) + "\n")
-		names_file.write(word + "\n")
-	embeddings_file.close()
-	names_file.close()
+from embeddings import train_embeddings, read_embeddings, write_embeddings, find_closest_words
 
 def embeddings():
 	embeddings_path = '../embeddings'
@@ -60,9 +26,16 @@ def embeddings():
 	word2int = {word:i for (i, word) in enumerate(names)}
 
 	# Test embeddings by finding closest words
-	find_closest_words(embeddings, word2int, names, "joy")
-	find_closest_words(embeddings, word2int, names, "father")
-	find_closest_words(embeddings, word2int, names, "thou")
+	# find_closest_words(embeddings, word2int, names, "joy")
+	# find_closest_words(embeddings, word2int, names, "happy")
+	# find_closest_words(embeddings, word2int, names, "father")
+	# find_closest_words(embeddings, word2int, names, "son")
+	# find_closest_words(embeddings, word2int, names, "thou")
+	# find_closest_words(embeddings, word2int, names, "you")
+	find_closest_words(embeddings, word2int, names, "kill")
+	find_closest_words(embeddings, word2int, names, "marry")
+	find_closest_words(embeddings, word2int, names, "stand")
+	find_closest_words(embeddings, word2int, names, "sit")
 
 def train(model, train_modern, train_original):
 
