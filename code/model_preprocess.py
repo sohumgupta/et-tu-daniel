@@ -5,6 +5,7 @@ UNK_TOKEN = "*unk*"
 WINDOW_SIZE = 14
 
 from preprocess import get_words, construct_vocab
+import numpy as np
 
 def pad_sentences(modern, original, sentence_length):
 	MODERN_padded_sentences = []
@@ -52,10 +53,11 @@ def preprocess(modern_train, original_train, modern_test, original_test):
 	modern_test_sentences, modern_test_length = get_sentences(modern_test)
 	original_test_sentences, original_test_length = get_sentences(original_test)
 	max_test_length = max(modern_test_length, original_test_length)
+	max_length = max(max_train_length, max_test_length)
 
 	# padding sentences
-	modern_train_sentences, original_train_sentences = pad_sentences(modern_train_sentences, original_train_sentences, max_train_length)
-	modern_test_sentences, original_test_sentences = pad_sentences(modern_test_sentences, original_test_sentences, max_test_length)
+	modern_train_sentences, original_train_sentences = pad_sentences(modern_train_sentences, original_train_sentences, max_length)
+	modern_test_sentences, original_test_sentences = pad_sentences(modern_test_sentences, original_test_sentences, max_length)
 
 	# constructing vocab
 	vocab, idx = construct_vocab(modern_train_sentences + original_train_sentences)
@@ -67,4 +69,4 @@ def preprocess(modern_train, original_train, modern_test, original_test):
 	original_train_idx = convert_to_id(vocab, original_train_sentences)
 	original_test_idx = convert_to_id(vocab, original_test_sentences)
 
-	return modern_train_idx, modern_test_idx, original_train_idx, original_test_idx, vocab, idx
+	return modern_train_idx, modern_test_idx, original_train_idx, original_test_idx, vocab, idx, vocab[PAD_TOKEN]

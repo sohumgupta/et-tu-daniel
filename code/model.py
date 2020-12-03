@@ -4,17 +4,18 @@ import tensorflow as tf
 from nltk.translate.bleu_score import corpus_bleu
 
 class Model(tf.keras.Model):
-    def __init__(self, embeddings):
+    def __init__(self, embeddings, vocab_size, window_size):
         #hyperparameters
         self.batch_size = 32
         self.embedding_size = 192
         self.hidden_state = 192
-        self.window_size = ?
-        self.vocab_size = ?
+        self.window_size = window_size
+        self.vocab_size = vocab_size
         self.optimizer = tf.keras.optimizers.Adam(learning_rate=0.001, epsilon=1e-08)
 
         #call without pointer
-        self.embedding = embeddings
+        self.embedding = tf.keras.layers.Embedding(self.vocab_size, self.embedding_size, embeddings_initializer = keras.initializers.Constant(embeddings))
+        self.embedding.trainable = False
         self.lstm_layer = tf.keras.layers.LSTM(self.hidden_state, return_sequences=True, return_state=True)
         self.encoder = tf.keras.layers.Bidirectional(self.lstm_layer, merge_mode='sum', input_shape =(self.batch_size, self.embedding_size))
         self.decoder_lstm = tf.keras.layers.LSTM(self.hidden_state, return_sequences=True, return_state=True)
@@ -31,14 +32,14 @@ class Model(tf.keras.Model):
 
     def call(self, encoder_input, decoder_input):
         encoder_embeddings = self.embedding(encoder_input)
-		whole_seq_output, final_memory_state, final_carry_state = self.encoder(inputs=encoder_embeddings, initial_state=None)
-		decoder_embeddings = self.embedding(decoder_input)
-		whole_seq_output, final_memory_state, final_carry_state = self.decoder_lstm(inputs=decoder_embeddings, initial_state=(final_memory_state, final_carry_state))
+        whole_seq_output, final_memory_state, final_carry_state = self.encoder(inputs=encoder_embeddings, initial_state=None)
+        decoder_embeddings = self.embedding(decoder_input)
+        whole_seq_output, final_memory_state, final_carry_state = self.decoder_lstm(inputs=decoder_embeddings, initial_state=(final_memory_state, final_carry_state))
         #can compute attention stuff here
-		decoder_probs = self.dense(whole_seq_output)
+        decoder_probs = self.dense(whole_seq_output)
         g = 0.5
         pointer_probs = decoder_probs
-		return tf.math.add(tf.math.multiply(g, decoder_probs), tf.math.multiply((1-g), pointer_probs))
+        return tf.math.add(tf.math.multiply(g, decoder_probs), tf.math.multiply((1-g), pointer_probs))
         #need to add attention and pointer stuff
 
     def build_ptr_prob(self, num_sentences, words_in_sentence, encoder_input, betas):
@@ -76,7 +77,7 @@ class Model(tf.keras.Model):
 
         #outputs for the encoder
         #whole_seq_output_enc [num_sentences, num_words_in_sentence, self.hidden_size]
-		whole_seq_output_enc, final_memory_state_enc, final_carry_state_enc = self.encoder(inputs=encoder_embeddings, initial_state=None)
+        whole_seq_output_enc, final_memory_state_enc, final_carry_state_enc = self.encoder(inputs=encoder_embeddings, initial_state=None)
 		
         #I need to concat each sentinel vector with each sentence group in the f_att vector
         #f_att doesn't change with each decoder iteration, so create it outside the loop
@@ -134,12 +135,10 @@ class Model(tf.keras.Model):
             probs_t = gs_mult * p_t_lstm + one_minus_g_mult * p_t_ptr
 
             probs[:, i, :] = probs_t
-
-		return probs
-        #need to add attention and pointer stuff
-
-	def loss_function(self, prbs, labels, mask):
-		return tf.reduce_mean(tf.boolean_mask(tf.keras.losses.sparse_categorical_crossentropy(labels, prbs), mask))
+        return probs
+        
+    def loss_function(self, prbs, labels, mask):
+        return tf.reduce_mean(tf.boolean_mask(tf.keras.losses.sparse_categorical_crossentropy(labels, prbs), mask))
 
     def bleu_score(self, references, candidates):
         return corpus_bleu(references, candidates)

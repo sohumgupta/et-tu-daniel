@@ -27,10 +27,10 @@ def get_sentences(file_paths):
 			all_sentences.append(sentence)
 	return all_sentences, max_length
 
-def pad_sentences(sentences, sentence_length):
+def pad_sentences(sentences, sentence_length, pad_token=''):
 	for (i, sentence) in enumerate(sentences):
 		if len(sentence) < sentence_length:
-			padding = ['' for _ in range(sentence_length - len(sentence))]
+			padding = [pad_token for _ in range(sentence_length - len(sentence))]
 			sentences[i] = sentences[i] + padding
 	return sentences
 

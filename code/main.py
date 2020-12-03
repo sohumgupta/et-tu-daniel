@@ -77,13 +77,13 @@ def test(model, test_modern, test_original, vocab, padding_index):
 		probs = tf.reshape(tf.argmax(probs, axis=2), [-1])
 		probs = tf.make_ndarray(probs)
 		#need to get sentences to calculate bleu score
-		pred_sentences = np.vstack((pred_sentences, sentences))
+		# pred_sentences = np.vstack((pred_sentences, sentences))
 		mask = tf.where(tf.equal(batch_labels, padding_index), tf.zeros(tf.shape(batch_labels)), tf.ones(tf.shape(batch_labels)))
 		loss = model.loss_function(probs, batch_labels, mask)
 
 def main():
 	embeddings = embeddings_call()
-	modern_train_idx, modern_test_idx, original_train_idx, original_test_idx, vocab, idx = preprocess("../data/train_modern.txt", "../data/train_original.txt", "../data/test_modern.txt", "../data/test_original.txt")
+	modern_train_idx, modern_test_idx, original_train_idx, original_test_idx, vocab, idx, padding_index = preprocess("../data/train_modern.txt", "../data/train_original.txt", "../data/test_modern.txt", "../data/test_original.txt")
 	model = Model(embeddings, len(vocab))
 	train(model, modern_train_idx, original_train_idx, padding_index)
 	test(model, modern_test_idx, original_test_idx, vocab, padding_index)
