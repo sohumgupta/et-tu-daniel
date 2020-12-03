@@ -37,6 +37,54 @@ def embeddings():
 	find_closest_words(embeddings, word2int, names, "stand")
 	find_closest_words(embeddings, word2int, names, "sit")
 
+def train(model, train_modern, train_original):
+
+	size = len(train_modern)
+	indices = np.arange(size)
+	shuffled_indices = tf.random.shuffle(indices)
+	train_modern = tf.gather(train_modern, shuffled_indices, None, axis=0, batch_dims=0)
+	train_original = tf.gather(train_original, shuffled_indices, None, axis=0, batch_dims=0)
+	for i in range(size//model.batch_size):
+		batch_inputs = tf.gather(train_modern, indices[i*model.batch_size:(i+1)*model.batch_size], None, axis=0, batch_dims=0)
+		batch_labels = tf.gather(train_original, indices[i*model.batch_size:(i+1)*model.batch_size], None, axis=0, batch_dims=0)
+		batch_decoder_inputs = batch_labels[:, :-1]
+		batch_labels = batch_labels[:, 1:]
+		with tf.GradientTape() as tape:
+			probs = model.call_with_pointer(batch_inputs, batch_decoder_inputs)
+			loss = model.loss_function(probs, batch_labels)
+		gradients = tape.gradient(loss, model.trainable_variables)
+		model.optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+	pass
+
+def test(model, test_modern, test_original, vocab):
+
+	size = len(test_modern)
+	indices = np.arange(size)
+	shuffled_indices = tf.random.shuffle(indices)
+	test_modern = tf.gather(test_modern, shuffled_indices, None, axis=0, batch_dims=0)
+	test_original = tf.gather(test_original, shuffled_indices, None, axis=0, batch_dims=0)
+	pred_sentences = np.zeros((test_modern.shape))
+	for i in range(size//model.batch_size):
+		batch_inputs = tf.gather(test_modern, indices[i*model.batch_size:(i+1)*model.batch_size], None, axis=0, batch_dims=0)
+		batch_labels = tf.gather(test_original, indices[i*model.batch_size:(i+1)*model.batch_size], None, axis=0, batch_dims=0)
+		batch_decoder_inputs = batch_labels[:, :-1]
+		batch_labels = batch_labels[:, 1:]
+		probs = model.call(batch_inputs, batch_decoder_inputs)
+		probs = tf.argmax(probs, axis=2)
+		probs = tf.make_ndarray(probs)
+		sentences = 
+		pred_sentences = np.vstack((pred_sentences, sentences))
+		loss = model.loss_function(probs, batch_labels)
+		acc = model.accuracy_function(probs, batch_labels, mask)
+		words = tf.math.count_nonzero(mask, dtype='float32')
+		tot_loss += loss
+		tot_acc += acc * words
+		tot_words += words
+	perp = tf.math.exp(tot_loss/tot_words)
+	acc = tot_acc/tot_words
+	return perp,acc
+
+
 def main():
 	embeddings()
 
