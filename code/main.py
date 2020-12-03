@@ -9,8 +9,10 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 import io
 
 from embeddings import train_embeddings, read_embeddings, write_embeddings, find_closest_words
+from model_preprocess import preprocess
+from model import Model
 
-def embeddings():
+def embeddings_call():
 	embeddings_path = '../embeddings'
 	
 	# Train embeddings if necessary
@@ -36,8 +38,9 @@ def embeddings():
 	find_closest_words(embeddings, word2int, names, "marry")
 	find_closest_words(embeddings, word2int, names, "stand")
 	find_closest_words(embeddings, word2int, names, "sit")
+	return embeddings
 
-def train(model, train_modern, train_original):
+def train(model, train_modern, train_original, padding_index):
 
 	size = len(train_modern)
 	indices = np.arange(size)
@@ -49,14 +52,15 @@ def train(model, train_modern, train_original):
 		batch_labels = tf.gather(train_original, indices[i*model.batch_size:(i+1)*model.batch_size], None, axis=0, batch_dims=0)
 		batch_decoder_inputs = batch_labels[:, :-1]
 		batch_labels = batch_labels[:, 1:]
+		mask = tf.where(tf.equal(batch_labels, padding_index), tf.zeros(tf.shape(batch_labels)), tf.ones(tf.shape(batch_labels)))
 		with tf.GradientTape() as tape:
 			probs = model.call_with_pointer(batch_inputs, batch_decoder_inputs)
-			loss = model.loss_function(probs, batch_labels)
+			loss = model.loss_function(probs, batch_labels, mask)
 		gradients = tape.gradient(loss, model.trainable_variables)
 		model.optimizer.apply_gradients(zip(gradients, model.trainable_variables))
 	pass
 
-def test(model, test_modern, test_original, vocab):
+def test(model, test_modern, test_original, vocab, padding_index):
 
 	size = len(test_modern)
 	indices = np.arange(size)
@@ -70,23 +74,24 @@ def test(model, test_modern, test_original, vocab):
 		batch_decoder_inputs = batch_labels[:, :-1]
 		batch_labels = batch_labels[:, 1:]
 		probs = model.call(batch_inputs, batch_decoder_inputs)
-		probs = tf.argmax(probs, axis=2)
+		probs = tf.reshape(tf.argmax(probs, axis=2), [-1])
 		probs = tf.make_ndarray(probs)
-		sentences = 
+		#need to get sentences to calculate bleu score
 		pred_sentences = np.vstack((pred_sentences, sentences))
-		loss = model.loss_function(probs, batch_labels)
-		acc = model.accuracy_function(probs, batch_labels, mask)
-		words = tf.math.count_nonzero(mask, dtype='float32')
-		tot_loss += loss
-		tot_acc += acc * words
-		tot_words += words
-	perp = tf.math.exp(tot_loss/tot_words)
-	acc = tot_acc/tot_words
-	return perp,acc
-
+		mask = tf.where(tf.equal(batch_labels, padding_index), tf.zeros(tf.shape(batch_labels)), tf.ones(tf.shape(batch_labels)))
+		loss = model.loss_function(probs, batch_labels, mask)
 
 def main():
-	embeddings()
+	embeddings = embeddings_call()
+	modern_train_idx, modern_test_idx, original_train_idx, original_test_idx, vocab, idx = preprocess("../data/train_modern.txt", "../data/train_original.txt", "../data/test_modern.txt", "../data/test_original.txt")
+	model = Model(embeddings, len(vocab))
+	train(model, modern_train_idx, original_train_idx, padding_index)
+	test(model, modern_test_idx, original_test_idx, vocab, padding_index)
+	# TODO:
+	# 1) Check format of embeddings matrix
+	# 2) Get padding index 
+	# 3) Create embedding layer in model 
+	# 4) Create sentences to calculate BLEU score in test 
 
 if __name__ == '__main__':
 	main()
