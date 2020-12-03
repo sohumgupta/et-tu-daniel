@@ -68,5 +68,3 @@ def preprocess(modern_train, original_train, modern_test, original_test):
 	original_test_idx = convert_to_id(vocab, original_test_sentences)
 
 	return modern_train_idx, modern_test_idx, original_train_idx, original_test_idx, vocab, idx
-
-preprocess("../data/train_modern.txt", "../data/train_original.txt", "../data/test_modern.txt", "../data/test_original.txt")
