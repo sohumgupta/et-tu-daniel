@@ -1,10 +1,12 @@
 import os
 import numpy as np
 import tensorflow as tf
+from tensorflow import keras
 from nltk.translate.bleu_score import corpus_bleu
 
 class Model(tf.keras.Model):
     def __init__(self, embeddings, vocab_size, window_size):
+        super(Model, self).__init__()
         #hyperparameters
         self.batch_size = 32
         self.embedding_size = 192
@@ -23,10 +25,9 @@ class Model(tf.keras.Model):
         self.dense = tf.keras.layers.Dense(self.vocab_size, activation='softmax')
 
         #call with pointer
-        self.decoder_cell = tf.keras.layers.LSTMCell(self.hidden_state, return_sequences=True, return_state=True)
         self.query_weights = tf.keras.layers.Dense(self.hidden_state, use_bias=False) #dense layer? no bias?
-        self.sentinel_vec = tf.variable(tf.random.truncated_normal([1, self.hidden_state], stddev=.1))
-        self.a_bias = tf.variable(tf.random.truncated_normal([1, self.window_size], stddev=.1))
+        self.sentinel_vec = tf.Variable(tf.random.truncated_normal([1, self.hidden_state], stddev=.1))
+        self.a_bias = tf.Variable(tf.random.truncated_normal([1, self.window_size], stddev=.1))
 
         pass
 
@@ -46,24 +47,25 @@ class Model(tf.keras.Model):
         #num_sentences, words_in_sentence
         #num_sentences, words_in_sentence
         #num_sentences, 1, vocab_size
-        index_mult = np.arange(num_sentences).reshape((-1, 1))
-        index_mult_repeated = np.repeat(index_mult, words_in_sentence, axis=1)
 
-        encoder_indices = encoder_input.numpy()
-        indices  = encoder_indices * index_mult_repeated
+        # index_mult = np.arange(num_sentences).reshape((-1, 1))
+        # index_mult_repeated = np.repeat(index_mult, words_in_sentence, axis=1)
 
-        p_t_ptr = np.zeros([num_sentences, 1, self.vocab_size])
-
-        np.put(p_t_ptr, indices, betas.flatten())
+        # encoder_indices = encoder_input.numpy()
+        # indices  = encoder_indices * index_mult_repeated
 
         # p_t_ptr = np.zeros([num_sentences, 1, self.vocab_size])
+
+        # np.put(p_t_ptr, indices, betas.flatten())
+
+        p_t_ptr = tf.zeros([num_sentences, 1, self.vocab_size])
         
-        # for i in range(num_sentences):
-        #     for j in range(words_in_sentence):
-        #         vocab_index = encoder_input[i, j]
-        #         p_t_ptr[i, 1, vocab_index] = betas[i, j] 
+        for i in range(num_sentences):
+            for j in range(words_in_sentence):
+                vocab_index = encoder_input[i, j]
+                p_t_ptr[i, 1, vocab_index] = betas[i, j] 
         
-        return tf.convert_to_tensor(p_t_ptr)
+        return p_t_ptr
 
     def call_with_pointer(self, encoder_input, decoder_input):
         num_sentences = encoder_input.shape[0]
