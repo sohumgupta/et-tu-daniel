@@ -1,8 +1,6 @@
 import numpy as np
 import tensorflow as tf
 
-from embeddings import get_embeddings
-
 PAD_TOKEN = "*pad*"
 STOP_TOKEN = "*stop*"
 START_TOKEN = "*start*"
@@ -44,38 +42,3 @@ def construct_vocab(sentences):
 	int2word = {i:word for (i, word) in enumerate(all_words)}
 	word2int = {word:i for (i, word) in enumerate(all_words)}
 	return word2int, int2word
-
-def preprocess(modern_train, original_train, modern_test, original_test, modern_valid, original_valid):
-	"""
-	Input: respective file paths
-	Output: modern_train_idx, modern_test_idx, original_train_idx, original_test_idx, vocab, idx, embeddings
-	"""
-	# train
-	modern_train_sentences, modern_train_length = get_sentences([modern_train, modern_valid])
-	original_train_sentences, original_train_length = get_sentences([original_train, original_valid])
-	max_train_length = max(modern_train_length, original_train_length)
-
-	# test
-	modern_test_sentences, modern_test_length = get_sentences([modern_test])
-	original_test_sentences, original_test_length = get_sentences([original_test])
-	max_test_length = max(modern_test_length, original_test_length)
-
-	max_length = max(max_train_length, max_test_length)
-
-	# padding sentences
-	modern_train_sentences, original_train_sentences = pad_sentences(modern_train_sentences, max_length), pad_sentences(original_train_sentences, max_length)
-	modern_test_sentences, original_test_sentences = pad_sentences(modern_test_sentences, max_length), pad_sentences(original_test_sentences, max_length)
-
-	# get embeddings
-	embeddings, vocab, idx = get_embeddings()
-
-	# constructing IDs
-	modern_train_idx = vectorize_sentences(vocab, modern_train_sentences)
-	modern_test_idx = vectorize_sentences(vocab, modern_test_sentences)
-
-	original_train_idx = vectorize_sentences(vocab, original_train_sentences)
-	original_test_idx = vectorize_sentences(vocab, original_test_sentences)
-
-	return modern_train_idx, modern_test_idx, original_train_idx, original_test_idx, vocab, idx, vocab[PAD_TOKEN], embeddings
-
-preprocess("../data/train_modern.txt", "../data/train_original.txt", "../data/test_modern.txt", "../data/test_original.txt", "../data/valid_modern.txt", "../data/valid_original.txt")

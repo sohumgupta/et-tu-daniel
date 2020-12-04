@@ -5,6 +5,7 @@ from os import listdir
 from os.path import isfile, join
 from tqdm import tqdm
 from word2vec import Word2Vec
+from tqdm import tqdm
 import io
 
 from preprocess import construct_vocab, get_sentences, vectorize_sentences, pad_sentences
@@ -14,7 +15,7 @@ def get_training_data(sentences, vocab_size, negative_samples, window_size):
 
 	sampling_table = tf.keras.preprocessing.sequence.make_sampling_table(vocab_size)
 
-	for sentence in sentences:
+	for sentence in tqdm(sentences):
 		positive_examples, _ = tf.keras.preprocessing.sequence.skipgrams(
 			sentence,
 			vocabulary_size=vocab_size,
@@ -116,7 +117,7 @@ def get_embeddings():
 	# Train embeddings if necessary
 	if 'embeddings.tsv' not in listdir(embeddings_path) or 'names.tsv' not in listdir(embeddings_path):
 		print(f"Training word embeddings...")
-		embeddings, word2int, int2word = train_embeddings(10, 5)
+		embeddings, word2int, int2word = train_embeddings(1, 1)
 		write_embeddings(embeddings, word2int, embeddings_path)
 	else:
 		print(f"Word embeddings found.")

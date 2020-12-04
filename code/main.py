@@ -8,7 +8,8 @@ from os.path import isfile, join
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 import io
 
-from preprocess import preprocess
+from preprocess import get_sentences, pad_sentences, vectorize_sentences
+from embeddings import get_embeddings
 from model import Model
 
 def train(model, train_modern, train_original, padding_index):
@@ -52,9 +53,42 @@ def test(model, test_modern, test_original, vocab, padding_index):
 		mask = tf.where(tf.equal(batch_labels, padding_index), tf.zeros(tf.shape(batch_labels)), tf.ones(tf.shape(batch_labels)))
 		loss = model.loss_function(probs, batch_labels, mask)
 
+def preprocess_model(modern_train, original_train, modern_test, original_test, modern_valid, original_valid):
+	"""
+	Input: respective file paths
+	Output: modern_train_idx, modern_test_idx, original_train_idx, original_test_idx, vocab, idx, embeddings, sentence_length
+	"""
+	# train
+	modern_train_sentences, modern_train_length = get_sentences([modern_train, modern_valid])
+	original_train_sentences, original_train_length = get_sentences([original_train, original_valid])
+	max_train_length = max(modern_train_length, original_train_length)
+
+	# test
+	modern_test_sentences, modern_test_length = get_sentences([modern_test])
+	original_test_sentences, original_test_length = get_sentences([original_test])
+	max_test_length = max(modern_test_length, original_test_length)
+
+	max_length = max(max_train_length, max_test_length)
+
+	# padding sentences
+	modern_train_sentences, original_train_sentences = pad_sentences(modern_train_sentences, max_length), pad_sentences(original_train_sentences, max_length)
+	modern_test_sentences, original_test_sentences = pad_sentences(modern_test_sentences, max_length), pad_sentences(original_test_sentences, max_length)
+
+	# get embeddings
+	embeddings, vocab, idx = get_embeddings()
+
+	# constructing IDs
+	modern_train_idx = vectorize_sentences(vocab, modern_train_sentences)
+	modern_test_idx = vectorize_sentences(vocab, modern_test_sentences)
+
+	original_train_idx = vectorize_sentences(vocab, original_train_sentences)
+	original_test_idx = vectorize_sentences(vocab, original_test_sentences)
+
+	return modern_train_idx, modern_test_idx, original_train_idx, original_test_idx, vocab, idx, vocab["*pad*"], embeddings, max_length
+
 def main():
-	modern_train_idx, modern_test_idx, original_train_idx, original_test_idx, vocab, idx, padding_index, embeddings = preprocess("../data/train_modern.txt", "../data/train_original.txt", "../data/test_modern.txt", "../data/test_original.txt", "../data/valid_modern.txt", "../data/valid_original.txt")
-	model = Model(embeddings, len(vocab))
+	modern_train_idx, modern_test_idx, original_train_idx, original_test_idx, vocab, idx, padding_index, embeddings, sentence_length = preprocess_model("../data/train_modern.txt", "../data/train_original.txt", "../data/test_modern.txt", "../data/test_original.txt", "../data/valid_modern.txt", "../data/valid_original.txt")
+	model = Model(embeddings, len(vocab), sentence_length + 2)
 	train(model, modern_train_idx, original_train_idx, padding_index)
 	test(model, modern_test_idx, original_test_idx, vocab, padding_index)
 	# TODO:
