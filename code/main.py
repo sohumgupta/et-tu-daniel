@@ -8,37 +8,8 @@ from os.path import isfile, join
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 import io
 
-from embeddings import train_embeddings, read_embeddings, write_embeddings, find_closest_words
-from model_preprocess import preprocess
+from preprocess import preprocess
 from model import Model
-
-def embeddings_call():
-	embeddings_path = '../embeddings'
-	
-	# Train embeddings if necessary
-	if 'embeddings.tsv' not in listdir(embeddings_path) or 'names.tsv' not in listdir(embeddings_path):
-		print(f"Training word embeddings...")
-		embeddings, word2int, int2word = train_embeddings()
-		write_embeddings(embeddings, word2int, embeddings_path)
-	else:
-		print(f"Word embeddings found.")
-
-	# Read embeddings from files
-	embeddings, names = read_embeddings(embeddings_path)
-	word2int = {word:i for (i, word) in enumerate(names)}
-
-	# Test embeddings by finding closest words
-	# find_closest_words(embeddings, word2int, names, "joy")
-	# find_closest_words(embeddings, word2int, names, "happy")
-	# find_closest_words(embeddings, word2int, names, "father")
-	# find_closest_words(embeddings, word2int, names, "son")
-	# find_closest_words(embeddings, word2int, names, "thou")
-	# find_closest_words(embeddings, word2int, names, "you")
-	find_closest_words(embeddings, word2int, names, "kill")
-	find_closest_words(embeddings, word2int, names, "marry")
-	find_closest_words(embeddings, word2int, names, "stand")
-	find_closest_words(embeddings, word2int, names, "sit")
-	return embeddings
 
 def train(model, train_modern, train_original, padding_index):
 
@@ -82,8 +53,7 @@ def test(model, test_modern, test_original, vocab, padding_index):
 		loss = model.loss_function(probs, batch_labels, mask)
 
 def main():
-	embeddings = embeddings_call()
-	modern_train_idx, modern_test_idx, original_train_idx, original_test_idx, vocab, idx, padding_index = preprocess("../data/train_modern.txt", "../data/train_original.txt", "../data/test_modern.txt", "../data/test_original.txt", "../data/valid_modern.txt", "../data/valid_original.txt")
+	modern_train_idx, modern_test_idx, original_train_idx, original_test_idx, vocab, idx, padding_index, embeddings = preprocess("../data/train_modern.txt", "../data/train_original.txt", "../data/test_modern.txt", "../data/test_original.txt", "../data/valid_modern.txt", "../data/valid_original.txt")
 	model = Model(embeddings, len(vocab))
 	train(model, modern_train_idx, original_train_idx, padding_index)
 	test(model, modern_test_idx, original_test_idx, vocab, padding_index)

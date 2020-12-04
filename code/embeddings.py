@@ -1,13 +1,13 @@
 import numpy as np
 import tensorflow as tf
-from preprocess import construct_vocab, get_sentences, vectorize_sentences, pad_sentences
 import os
 from os import listdir
 from os.path import isfile, join
 from tqdm import tqdm
 from word2vec import Word2Vec
 import io
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+
+from preprocess import construct_vocab, get_sentences, vectorize_sentences, pad_sentences
 
 def get_training_data(sentences, vocab_size, negative_samples, window_size):
 	targets, contexts, labels = [], [], []
@@ -40,7 +40,7 @@ def get_training_data(sentences, vocab_size, negative_samples, window_size):
 
 	return targets, contexts, labels
 
-def train_embeddings():
+def train_embeddings(NEGATIVE_SAMPLES, NUM_EPOCHS):
 	data_path = '../data'
 	all_paths = [join(data_path, f) for f in listdir(data_path) if isfile(join(data_path, f))]
 
@@ -49,13 +49,12 @@ def train_embeddings():
 	all_sentences = pad_sentences(all_sentences, sentence_length=max_length)
 	word2int, int2word = construct_vocab(all_sentences)
 	print(f"Vocab Size: {len(word2int)}")
-	sentence_vectors = vectorize_sentences(all_sentences, word2int)
+	sentence_vectors = vectorize_sentences(word2int, all_sentences)
 	print(f"Number of Sentences: {len(all_sentences)}")
 
 	VOCAB_SIZE = len(word2int)
 	SENTENCE_LENGTH = max_length
 	WINDOW_SIZE = 2
-	NEGATIVE_SAMPLES = 100
 
 	print(f"Generating training data...")
 	targets, contexts, labels = get_training_data(
@@ -66,7 +65,6 @@ def train_embeddings():
 	print(f"Number of Training Examples: {len(labels)}")
 
 	BATCH_SIZE = 1000
-	NUM_EPOCHS = 25
 
 	dataset = tf.data.Dataset.from_tensor_slices(((targets, contexts), labels))
 	dataset = dataset.shuffle(VOCAB_SIZE).batch(BATCH_SIZE, drop_remainder=True)
@@ -111,3 +109,20 @@ def write_embeddings(embeddings, word2int, embeddings_path):
 		names_file.write(word + "\n")
 	embeddings_file.close()
 	names_file.close()
+
+def get_embeddings():
+	embeddings_path = '../embeddings'
+	
+	# Train embeddings if necessary
+	if 'embeddings.tsv' not in listdir(embeddings_path) or 'names.tsv' not in listdir(embeddings_path):
+		print(f"Training word embeddings...")
+		embeddings, word2int, int2word = train_embeddings(10, 5)
+		write_embeddings(embeddings, word2int, embeddings_path)
+	else:
+		print(f"Word embeddings found.")
+
+	# Read embeddings from files
+	embeddings, names = read_embeddings(embeddings_path)
+	word2int = {word:i for (i, word) in enumerate(names)}
+	int2word = {i:word for (i, word) in word2int.items()}
+	return embeddings, word2int, int2word
