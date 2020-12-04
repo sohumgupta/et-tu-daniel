@@ -1,12 +1,14 @@
 import numpy as np
 import tensorflow as tf
 
-def vectorize_sentences(sentences, word2int):
-	sentence_vectors = []
-	for sentence in sentences:
-		vectorized = [word2int[word] for word in sentence]
-		sentence_vectors.append(np.array(vectorized))
-	return sentence_vectors
+from embeddings import get_embeddings
+
+PAD_TOKEN = "*pad*"
+STOP_TOKEN = "*stop*"
+START_TOKEN = "*start*"
+
+def vectorize_sentences(vocab, sentences):
+	return np.stack([[vocab[word] for word in sentence] for sentence in sentences])
 
 def get_words(sentence):
 	punctuation = '''!()-[]{};:'"\, <>./?@#$%^&*_~'''
