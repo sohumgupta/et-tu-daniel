@@ -34,10 +34,10 @@ def embeddings_call():
 	# find_closest_words(embeddings, word2int, names, "son")
 	# find_closest_words(embeddings, word2int, names, "thou")
 	# find_closest_words(embeddings, word2int, names, "you")
-	# find_closest_words(embeddings, word2int, names, "kill")
-	# find_closest_words(embeddings, word2int, names, "marry")
-	# find_closest_words(embeddings, word2int, names, "stand")
-	# find_closest_words(embeddings, word2int, names, "sit")
+	find_closest_words(embeddings, word2int, names, "kill")
+	find_closest_words(embeddings, word2int, names, "marry")
+	find_closest_words(embeddings, word2int, names, "stand")
+	find_closest_words(embeddings, word2int, names, "sit")
 	return embeddings
 
 def train(model, train_modern, train_original, padding_index):
@@ -84,11 +84,9 @@ def test(model, test_modern, test_original, vocab, padding_index):
 def main():
 	embeddings = embeddings_call()
 	modern_train_idx, modern_test_idx, original_train_idx, original_test_idx, vocab, idx, padding_index = preprocess("../data/train_modern.txt", "../data/train_original.txt", "../data/test_modern.txt", "../data/test_original.txt", "../data/valid_modern.txt", "../data/valid_original.txt")
-	print(embeddings.shape)
-	print(len(vocab))
-	# model = Model(embeddings, len(vocab), 101)
-	# train(model, modern_train_idx, original_train_idx, padding_index)
-	# test(model, modern_test_idx, original_test_idx, vocab, padding_index)
+	model = Model(embeddings, len(vocab))
+	train(model, modern_train_idx, original_train_idx, padding_index)
+	test(model, modern_test_idx, original_test_idx, vocab, padding_index)
 	# TODO:
 	# 1) Check format of embeddings matrix
 	# 2) Get padding index 
