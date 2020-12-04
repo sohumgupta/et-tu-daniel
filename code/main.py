@@ -83,7 +83,7 @@ def test(model, test_modern, test_original, vocab, padding_index):
 
 def main():
 	embeddings = embeddings_call()
-	modern_train_idx, modern_test_idx, original_train_idx, original_test_idx, vocab, idx, padding_index = preprocess("../data/train_modern.txt", "../data/train_original.txt", "../data/test_modern.txt", "../data/test_original.txt")
+	modern_train_idx, modern_test_idx, original_train_idx, original_test_idx, vocab, idx, padding_index = preprocess("../data/train_modern.txt", "../data/train_original.txt", "../data/test_modern.txt", "../data/test_original.txt", "../data/valid_modern.txt", "../data/valid_original.txt")
 	model = Model(embeddings, len(vocab))
 	train(model, modern_train_idx, original_train_idx, padding_index)
 	test(model, modern_test_idx, original_test_idx, vocab, padding_index)
