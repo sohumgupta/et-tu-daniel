@@ -19,7 +19,9 @@ def train(model, train_modern, train_original, padding_index):
 	shuffled_indices = tf.random.shuffle(indices)
 	train_modern = tf.gather(train_modern, shuffled_indices, None, axis=0, batch_dims=0)
 	train_original = tf.gather(train_original, shuffled_indices, None, axis=0, batch_dims=0)
-	for i in range(size//model.batch_size):
+	print(f"batch size: {size//model.batch_size}")
+	for i in range(5):
+		print(i)
 		batch_inputs = tf.gather(train_modern, indices[i*model.batch_size:(i+1)*model.batch_size], None, axis=0, batch_dims=0)
 		batch_labels = tf.gather(train_original, indices[i*model.batch_size:(i+1)*model.batch_size], None, axis=0, batch_dims=0)
 		batch_decoder_inputs = batch_labels[:, :-1]
@@ -40,12 +42,14 @@ def test(model, test_modern, test_original, vocab, padding_index):
 	test_modern = tf.gather(test_modern, shuffled_indices, None, axis=0, batch_dims=0)
 	test_original = tf.gather(test_original, shuffled_indices, None, axis=0, batch_dims=0)
 	pred_sentences = np.zeros((test_modern.shape))
-	for i in range(size//model.batch_size):
+	print(f"batch size: {size//model.batch_size}")
+	for i in range(5):
+		print(i)
 		batch_inputs = tf.gather(test_modern, indices[i*model.batch_size:(i+1)*model.batch_size], None, axis=0, batch_dims=0)
 		batch_labels = tf.gather(test_original, indices[i*model.batch_size:(i+1)*model.batch_size], None, axis=0, batch_dims=0)
 		batch_decoder_inputs = batch_labels[:, :-1]
 		batch_labels = batch_labels[:, 1:]
-		probs = model.call(batch_inputs, batch_decoder_inputs)
+		probs = model.call_with_pointer(batch_inputs, batch_decoder_inputs)
 		probs = tf.reshape(tf.argmax(probs, axis=2), [-1])
 		probs = tf.make_ndarray(probs)
 		#need to get sentences to calculate bleu score

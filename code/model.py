@@ -10,7 +10,7 @@ class Model(tf.keras.Model):
 		super(Model, self).__init__()
 
 		#hyperparameters
-		self.batch_size = 32
+		self.batch_size = 8
 		self.embedding_size = 192
 		self.hidden_state = 192
 		self.window_size = window_size
@@ -29,7 +29,7 @@ class Model(tf.keras.Model):
 		#call with pointer
 		self.query_weights = Dense(self.hidden_state, use_bias=False) #dense layer? no bias?
 		self.sentinel_vec = tf.Variable(tf.random.truncated_normal([1, self.hidden_state], stddev=.1))
-		self.a_bias = tf.Variable(tf.random.truncated_normal([1, self.window_size + 1], stddev=.1))
+		self.a_bias = tf.Variable(tf.random.truncated_normal([self.window_size, self.window_size + 1], stddev=.1))
 
 		pass
 
@@ -59,15 +59,23 @@ class Model(tf.keras.Model):
 
 		# np.put(p_t_ptr, indices, betas.flatten())
 
-		p_t_ptr = np.zeros([num_sentences, 1, self.vocab_size])
-		
-		for i in range(num_sentences):
-		    for j in range(words_in_sentence):
-		        vocab_index = encoder_input[i, j]
-		        p_t_ptr[i, 0, vocab_index] = betas[i, j] 
-		
-		# return tf.convert_to_tensor(p_t_ptr)
+		p_t_ptr_empty = tf.zeros([num_sentences, self.vocab_size])
+
+		reshape_encoder_input = tf.reshape(encoder_input, [num_sentences, words_in_sentence, 1])
+		per_sentence_index = tf.broadcast_to(tf.reshape(tf.range(0, num_sentences), [num_sentences, 1, 1]), [num_sentences, words_in_sentence, 1]) 
+		indices = tf.reshape(tf.concat([per_sentence_index, reshape_encoder_input], 2), [-1, 2])
+
+		p_t_ptr = tf.tensor_scatter_nd_add(p_t_ptr_empty, indices, tf.reshape(betas, [-1]))
+
 		return p_t_ptr
+		
+		# for i in range(num_sentences):
+		#     for j in range(words_in_sentence):
+		#         vocab_index = encoder_input[i, j]
+		#         p_t_ptr[i, 0, vocab_index] = betas[i, j] 
+		
+		# # return tf.convert_to_tensor(p_t_ptr)
+		# return p_t_ptr
 
 	def call_with_pointer(self, encoder_input, decoder_input):
 		num_sentences = encoder_input.shape[0]
@@ -91,15 +99,15 @@ class Model(tf.keras.Model):
 		broadcasted_sentinel = tf.broadcast_to(self.sentinel_vec, [num_sentences, 1, self.hidden_state])
 		f_att = tf.concat([whole_seq_output_enc, broadcasted_sentinel], 1)
 
-		#these variable eventually becomes the input for each decoder LSTMCell iteration
+		#these variables eventually become the input for each decoder iteration
 		#fmsd = h_dec_(t-1) technically, the last HIDDEN (memory) state, not carry, that we use for all our calcs
 		final_memory_state_dec = final_memory_state_enc
 		final_carry_state_dec = final_carry_state_enc
 
-		probs = tf.zeros([num_sentences, num_words_in_sentence, self.vocab_size])
+		probs = tf.zeros([num_sentences, 0, self.vocab_size])
 
-		#looping for each Decoder LSTMCell iteration
-		for i in range(num_words_in_sentence):
+		#looping for each Decoder iteration
+		for i in range(0, num_words_in_sentence - 1):
 			#[num_sentences, self.hidden_state]
 			queries = self.query_weights(final_memory_state_dec)
 			reshaped_queries = tf.reshape(queries, [num_sentences, 1, self.hidden_state]) # [32, 1, 192]
@@ -108,40 +116,40 @@ class Model(tf.keras.Model):
 			#creation of a, works entire batch simultaneously, should auto-broadcast self.a_bias
 			#a is [num_sentences, num_words_in_sentence + 1]
 			a_before_sum = tf.math.tanh(f_att * broadcasted_queries) # [32, 102, 192]
-			a_before_bias = tf.reshape(tf.reduce_sum(a_before_sum, 2), [num_sentences, 1, -1]) # [32, 102, 192]
-			a_squeezed = tf.squeeze(a_before_bias)
-			a = tf.nn.softmax(a_squeezed + self.a_bias)
+			a_before_bias = tf.reduce_sum(a_before_sum, 2)
+			# a_before_bias = tf.reshape(tf.reduce_sum(a_before_sum, 2), [num_sentences, 1, -1]) # [32, 102, 192]
+			# a_squeezed = tf.squeeze(a_before_bias)
+			a = tf.nn.softmax(a_before_bias + self.a_bias[i])
 
 			betas = a[:, 0:num_words_in_sentence]
-			gs = a[:, num_words_in_sentence]
+			gs = tf.reshape(a[:, num_words_in_sentence], [num_sentences, 1])
 			#tf.subtract
-			one_minus_g = tf.ones([num_sentences, 1]) - gs
+			one_minus_g = tf.subtract(tf.reshape(tf.ones(num_sentences), [num_sentences, 1]), gs)
 
 			p_t_ptr = self.build_ptr_prob(num_sentences, num_words_in_sentence, encoder_input, betas)
 
 			#c_t is [num_sentences, self.hidden_state]
 			betas = tf.expand_dims(betas, 2)
 			c_t = tf.reduce_sum(whole_seq_output_enc * betas, 1)
-			reshaped_c_t = tf.reshape(c_t, [num_sentences, 1, self.hidden_state])
-			broadcasted_c_t = tf.broadcast_to(reshaped_c_t, [num_sentences, num_words_in_sentence, self.hidden_state])
-
-			sliced_dec_emb = decoder_embeddings[:, :, i]
-
-			concat_emb = tf.concat([sliced_dec_emb, broadcasted_c_t], 1)
+		
+			sliced_dec_emb = decoder_embeddings[:, i, :]
+			concat_emb = tf.expand_dims(tf.concat([sliced_dec_emb, c_t], 1), 1)
 
 			_, final_memory_state_dec, final_carry_state_dec = self.decoder_lstm(inputs=concat_emb, initial_state=(final_memory_state_dec, final_carry_state_dec))
 
-			h_dec_t = tf.concat([final_memory_state, reshaped_c_t], 1)
+			h_dec_t = tf.concat([final_memory_state_dec, c_t], 1)
 
-			#p_t_lstm is hopefully [num_sentences, 1, self.vocab_size]
+			#p_t_lstm is hopefully [num_sentences, self.vocab_size]
 			p_t_lstm = self.dense(h_dec_t)
 
-			gs_mult = tf.broadcast_to(tf.reshape(gs, [num_sentences, 1, 1]), [num_sentences, 1, self.vocab_size])
-			one_minus_g_mult = tf.broadcast_to(tf.reshape(one_minus_g, [num_sentences, 1, 1]), [num_sentences, 1, self.vocab_size])
+			gs_mult = tf.broadcast_to(gs, [num_sentences, self.vocab_size])
+			one_minus_g_mult = tf.broadcast_to(one_minus_g, [num_sentences, self.vocab_size])
 			
 			probs_t = gs_mult * p_t_lstm + one_minus_g_mult * p_t_ptr
+			probs_t = tf.expand_dims(probs_t, 1)
 
-			probs[:, i, :] = probs_t
+			probs = tf.concat([probs, probs_t], 1)
+		
 		return probs
 		
 	def loss_function(self, prbs, labels, mask):
