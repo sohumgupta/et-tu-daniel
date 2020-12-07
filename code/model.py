@@ -2,6 +2,7 @@ import os
 import numpy as np
 import tensorflow as tf
 from nltk.translate.bleu_score import corpus_bleu
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 from tensorflow.keras.layers import Embedding, LSTM, Bidirectional, Dense, LSTMCell
 
@@ -10,7 +11,7 @@ class Model(tf.keras.Model):
 		super(Model, self).__init__()
 
 		#hyperparameters
-		self.batch_size = 8
+		self.batch_size = 100
 		self.embedding_size = 192
 		self.hidden_state = 192
 		self.window_size = window_size
@@ -18,28 +19,18 @@ class Model(tf.keras.Model):
 		self.optimizer = tf.keras.optimizers.Adam(learning_rate=0.001, epsilon=1e-08)
 
 		#call without pointer
-		self.embedding = Embedding(self.vocab_size, self.embedding_size, embeddings_initializer = tf.keras.initializers.Constant(embeddings))
+		self.embedding = Embedding(self.vocab_size, self.embedding_size, embeddings_initializer = tf.keras.initializers.Constant(embeddings), name="embedding_layer")
 		self.embedding.trainable = False
-		self.lstm_layer = LSTM(self.hidden_state, return_sequences=True, return_state=True)
-		self.encoder = Bidirectional(self.lstm_layer, merge_mode='sum', input_shape =(self.batch_size, self.embedding_size))
-		self.decoder_lstm = LSTM(self.hidden_state, return_sequences=True, return_state=True)
+		self.lstm_layer = LSTM(self.hidden_state, return_sequences=True, return_state=True, name="lstm_layer")
+		self.encoder = Bidirectional(self.lstm_layer, merge_mode='sum', input_shape =(self.batch_size, self.embedding_size), name="encoder")
+		self.decoder_lstm = LSTM(self.hidden_state, return_sequences=True, return_state=True, name="decoder_lstm")
 		# need to edit
-		self.dense = Dense(self.vocab_size, activation='softmax')
+		self.dense = Dense(self.vocab_size, activation='softmax', name="dense")
 
 		#call with pointer
-		self.query_weights = Dense(self.hidden_state, use_bias=False) #dense layer? no bias?
-		self.sentinel_vec = tf.Variable(tf.random.truncated_normal([1, self.hidden_state], stddev=.1))
-		self.a_bias = tf.Variable(tf.random.truncated_normal([self.window_size, self.window_size + 1], stddev=.1))    
-    
-    # def call(self, encoder_input, decoder_input):
-    #     encoder_embeddings = self.embedding(encoder_input)
-    #     whole_seq_output_enc, final_memory_state_enc_left, final_carry_state_enc_left, final_memory_state_enc_right, final_carry_state_enc_right = self.encoder(inputs=encoder_embeddings, initial_state=None)
-    #     final_memory_state_enc = final_memory_state_enc_left + final_memory_state_enc_right
-    #     final_carry_state_enc = final_carry_state_enc_left + final_carry_state_enc_right
-    #     decoder_embeddings = self.embedding(decoder_input)
-    #     whole_seq_output, final_memory_state, final_carry_state = self.decoder_lstm(inputs=decoder_embeddings, initial_state=(final_memory_state_enc, final_carry_state_enc))
-    #     probs = self.dense(whole_seq_output)
-    #     return probs
+		self.query_weights = Dense(self.hidden_state, use_bias=False, name="query_weights") #dense layer? no bias?
+		self.sentinel_vec = tf.Variable(tf.random.truncated_normal([1, self.hidden_state], stddev=.1), name="sentinel_vec")
+		self.a_bias = tf.Variable(tf.random.truncated_normal([self.window_size, self.window_size + 1], stddev=.1), name="a_bias")    
 
 	def build_ptr_prob(self, num_sentences, words_in_sentence, encoder_input, betas):
 		#num_sentences, words_in_sentence
@@ -73,7 +64,7 @@ class Model(tf.keras.Model):
 		# # return tf.convert_to_tensor(p_t_ptr)
 		# return p_t_ptr
 
-	def call_with_pointer(self, encoder_input, decoder_input):
+	def call(self, encoder_input, decoder_input):
 		num_sentences = encoder_input.shape[0]
 
 		#equivalent to number of hidden states, could also use self.window_size
