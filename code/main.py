@@ -34,14 +34,15 @@ def train(model, train_modern, train_original, padding_index):
 		model.optimizer.apply_gradients(zip(gradients, model.trainable_variables))
 	pass
 
-def test(model, test_modern, test_original, vocab, padding_index):
+def test(model, test_modern, test_original, idx, padding_index):
 
 	size = len(test_modern)
 	indices = np.arange(size)
 	shuffled_indices = tf.random.shuffle(indices)
 	test_modern = tf.gather(test_modern, shuffled_indices, None, axis=0, batch_dims=0)
 	test_original = tf.gather(test_original, shuffled_indices, None, axis=0, batch_dims=0)
-	pred_sentences = np.zeros((test_modern.shape))
+	pred_sentences = np.empty((test_modern.shape[0], test_modern.shape[1]-1), dtype=str)
+	input_sentences = np.empty((test_modern.shape), dtype=str)
 	print(f"batch size: {size//model.batch_size}")
 	for i in range(5):
 		print(i)
@@ -50,12 +51,24 @@ def test(model, test_modern, test_original, vocab, padding_index):
 		batch_decoder_inputs = batch_labels[:, :-1]
 		batch_labels = batch_labels[:, 1:]
 		probs = model.call_with_pointer(batch_inputs, batch_decoder_inputs)
-		probs = tf.reshape(tf.argmax(probs, axis=2), [-1])
-		probs = tf.make_ndarray(probs)
-		#need to get sentences to calculate bleu score
-		# pred_sentences = np.vstack((pred_sentences, sentences))
 		mask = tf.where(tf.equal(batch_labels, padding_index), tf.zeros(tf.shape(batch_labels)), tf.ones(tf.shape(batch_labels)))
 		loss = model.loss_function(probs, batch_labels, mask)
+		probs = tf.reshape(tf.argmax(probs, axis=2), [-1])
+		probs = probs.numpy()
+		words_pred = [idx[x] for x in probs]
+		sentences_pred = np.reshape(words_pred, batch_decoder_inputs.shape)
+		inputs = tf.reshape(batch_inputs, [-1])
+		inputs = inputs.numpy()
+		input_words = [idx[x] for x in inputs]
+		sentences_input = np.reshape(input_words, batch_inputs.shape)
+		pred_sentences[i*model.batch_size:(i+1)*model.batch_size] = sentences_pred
+		input_sentences[i*model.batch_size:(i+1)*model.batch_size] = sentences_input
+	pred_sentences = pred_sentences.tolist()
+	input_sentences = input_sentences.tolist()
+	# input_sentences = [input_sentences]
+	print(model.bleu_score(input_sentences, pred_sentences))
+		#need to get sentences to calculate bleu score
+		# pred_sentences = np.vstack((pred_sentences, sentences))
 
 def preprocess_model(modern_train, original_train, modern_test, original_test, modern_valid, original_valid):
 	"""
@@ -94,7 +107,7 @@ def main():
 	modern_train_idx, modern_test_idx, original_train_idx, original_test_idx, vocab, idx, padding_index, embeddings, sentence_length = preprocess_model("../data/train_modern.txt", "../data/train_original.txt", "../data/test_modern.txt", "../data/test_original.txt", "../data/valid_modern.txt", "../data/valid_original.txt")
 	model = Model(embeddings, len(vocab), sentence_length + 2)
 	train(model, modern_train_idx, original_train_idx, padding_index)
-	test(model, modern_test_idx, original_test_idx, vocab, padding_index)
+	test(model, modern_test_idx, original_test_idx, idx, padding_index)
 	# TODO:
 	# 1) Check format of embeddings matrix
 	# 2) Get padding index 

@@ -29,21 +29,17 @@ class Model(tf.keras.Model):
 		#call with pointer
 		self.query_weights = Dense(self.hidden_state, use_bias=False) #dense layer? no bias?
 		self.sentinel_vec = tf.Variable(tf.random.truncated_normal([1, self.hidden_state], stddev=.1))
-		self.a_bias = tf.Variable(tf.random.truncated_normal([self.window_size, self.window_size + 1], stddev=.1))
-
-		pass
-
-	def call(self, encoder_input, decoder_input):
-		encoder_embeddings = self.embedding(encoder_input)
-		whole_seq_output, final_memory_state, final_carry_state = self.encoder(inputs=encoder_embeddings, initial_state=None)
-		decoder_embeddings = self.embedding(decoder_input)
-		whole_seq_output, final_memory_state, final_carry_state = self.decoder_lstm(inputs=decoder_embeddings, initial_state=(final_memory_state, final_carry_state))
-		#can compute attention stuff here
-		decoder_probs = self.dense(whole_seq_output)
-		g = 0.5
-		pointer_probs = decoder_probs
-		return tf.math.add(tf.math.multiply(g, decoder_probs), tf.math.multiply((1-g), pointer_probs))
-		#need to add attention and pointer stuff
+		self.a_bias = tf.Variable(tf.random.truncated_normal([self.window_size, self.window_size + 1], stddev=.1))    
+    
+    # def call(self, encoder_input, decoder_input):
+    #     encoder_embeddings = self.embedding(encoder_input)
+    #     whole_seq_output_enc, final_memory_state_enc_left, final_carry_state_enc_left, final_memory_state_enc_right, final_carry_state_enc_right = self.encoder(inputs=encoder_embeddings, initial_state=None)
+    #     final_memory_state_enc = final_memory_state_enc_left + final_memory_state_enc_right
+    #     final_carry_state_enc = final_carry_state_enc_left + final_carry_state_enc_right
+    #     decoder_embeddings = self.embedding(decoder_input)
+    #     whole_seq_output, final_memory_state, final_carry_state = self.decoder_lstm(inputs=decoder_embeddings, initial_state=(final_memory_state_enc, final_carry_state_enc))
+    #     probs = self.dense(whole_seq_output)
+    #     return probs
 
 	def build_ptr_prob(self, num_sentences, words_in_sentence, encoder_input, betas):
 		#num_sentences, words_in_sentence
@@ -61,8 +57,8 @@ class Model(tf.keras.Model):
 
 		p_t_ptr_empty = tf.zeros([num_sentences, self.vocab_size])
 
-		reshape_encoder_input = tf.reshape(encoder_input, [num_sentences, words_in_sentence, 1])
-		per_sentence_index = tf.broadcast_to(tf.reshape(tf.range(0, num_sentences), [num_sentences, 1, 1]), [num_sentences, words_in_sentence, 1]) 
+		reshape_encoder_input = tf.cast(tf.reshape(encoder_input, [num_sentences, words_in_sentence, 1]), dtype=tf.int32)
+		per_sentence_index = tf.cast(tf.broadcast_to(tf.reshape(tf.range(0, num_sentences), [num_sentences, 1, 1]), [num_sentences, words_in_sentence, 1]), dtype=tf.int32) 
 		indices = tf.reshape(tf.concat([per_sentence_index, reshape_encoder_input], 2), [-1, 2])
 
 		p_t_ptr = tf.tensor_scatter_nd_add(p_t_ptr_empty, indices, tf.reshape(betas, [-1]))

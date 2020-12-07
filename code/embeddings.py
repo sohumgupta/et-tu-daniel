@@ -125,5 +125,5 @@ def get_embeddings():
 	# Read embeddings from files
 	embeddings, names = read_embeddings(embeddings_path)
 	word2int = {word:i for (i, word) in enumerate(names)}
-	int2word = {i:word for (i, word) in word2int.items()}
+	int2word = {i:word for (word, i) in word2int.items()}
 	return embeddings, word2int, int2word
