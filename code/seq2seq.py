@@ -19,8 +19,9 @@ class Seq2Seq(tf.keras.Model):
 		self.optimizer = tf.keras.optimizers.Adam(learning_rate=0.001, epsilon=1e-08)
 
 		#model layers
-		self.embedding = Embedding(self.vocab_size, self.embedding_size, embeddings_initializer = tf.keras.initializers.Constant(embeddings), name="embedding_layer")
-		self.embedding.trainable = False
+		# self.embedding = Embedding(self.vocab_size, self.embedding_size, embeddings_initializer = tf.keras.initializers.Constant(embeddings), name="embedding_layer")
+		self.embedding = Embedding(self.vocab_size, self.embedding_size, name="embedding_layer")
+		# self.embedding.trainable = False
 		self.lstm_layer = LSTM(self.hidden_state, return_sequences=True, return_state=True, name="lstm_layer")
 		self.encoder = Bidirectional(self.lstm_layer, merge_mode='sum', input_shape =(self.batch_size, self.embedding_size), name="encoder")
 		self.decoder_lstm = LSTM(self.hidden_state, return_sequences=True, return_state=True, name="decoder_lstm")
@@ -34,10 +35,12 @@ class Seq2Seq(tf.keras.Model):
 		decoder_embeddings = self.embedding(decoder_input)
 		whole_seq_output, final_memory_state, final_carry_state = self.decoder_lstm(inputs=decoder_embeddings, initial_state=(final_memory_state_enc, final_carry_state_enc))
 		probs = self.dense(whole_seq_output)
+
 		return probs
 		
 	def loss_function(self, prbs, labels, mask):
-		return tf.reduce_mean(tf.boolean_mask(tf.keras.losses.sparse_categorical_crossentropy(labels, prbs), mask))
+		loss = tf.keras.losses.sparse_categorical_crossentropy(labels, prbs)
+		return tf.reduce_sum(loss * mask)
 
 	def bleu_score(self, references, candidates):
 		return corpus_bleu(references, candidates)

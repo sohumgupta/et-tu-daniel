@@ -20,7 +20,7 @@ class Model(tf.keras.Model):
 
 		#call without pointer
 		self.embedding = Embedding(self.vocab_size, self.embedding_size, embeddings_initializer = tf.keras.initializers.Constant(embeddings), name="embedding_layer")
-		self.embedding.trainable = False
+		# self.embedding.trainable = False
 		self.lstm_layer = LSTM(self.hidden_state, return_sequences=True, return_state=True, name="lstm_layer")
 		self.encoder = Bidirectional(self.lstm_layer, merge_mode='sum', input_shape =(self.batch_size, self.embedding_size), name="encoder")
 		self.decoder_lstm = LSTM(self.hidden_state, return_sequences=True, return_state=True, name="decoder_lstm")
@@ -140,7 +140,8 @@ class Model(tf.keras.Model):
 		return probs
 		
 	def loss_function(self, prbs, labels, mask):
-		return tf.reduce_mean(tf.boolean_mask(tf.keras.losses.sparse_categorical_crossentropy(labels, prbs), mask))
+		loss = tf.keras.losses.sparse_categorical_crossentropy(labels, prbs)
+		return tf.reduce_sum(loss * mask)
 
 	def bleu_score(self, references, candidates):
 		return corpus_bleu(references, candidates)

@@ -29,7 +29,10 @@ def get_sentences(file_paths):
 
 def pad_sentences(sentences, sentence_length, pad_token=PAD_TOKEN, start_token=START_TOKEN, stop_token=STOP_TOKEN):
 	for (i, sentence) in enumerate(sentences):
-		sentences[i] = [start_token] + sentence + [stop_token] + ([pad_token] * (sentence_length - len(sentence)))
+		if (len(sentence) > sentence_length):
+			sentences[i] = [start_token] + sentence[:sentence_length] + [stop_token]
+		else:
+			sentences[i] = [start_token] + sentence + [stop_token] + ([pad_token] * (sentence_length - len(sentence)))
 	return sentences
 
 def construct_vocab(sentences):
