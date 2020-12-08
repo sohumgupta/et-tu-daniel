@@ -1,9 +1,9 @@
 import numpy as np
 import tensorflow as tf
 
-PAD_TOKEN = "*pad*"
-STOP_TOKEN = "*stop*"
-START_TOKEN = "*start*"
+PAD_TOKEN = "*PAD*"
+STOP_TOKEN = "*STOP*"
+START_TOKEN = "*START*"
 
 def vectorize_sentences(vocab, sentences):
 	return np.stack([[vocab[word] for word in sentence] for sentence in sentences])

@@ -3,7 +3,7 @@ import tensorflow as tf
 from tensorflow.keras.layers import Embedding, Dot, Flatten
 from tensorflow.keras.optimizers import Adam
 import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+# os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 class Word2Vec(tf.keras.Model):
 	def __init__(self, vocab_size):

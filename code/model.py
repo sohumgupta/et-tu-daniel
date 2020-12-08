@@ -2,7 +2,7 @@ import os
 import numpy as np
 import tensorflow as tf
 from nltk.translate.bleu_score import corpus_bleu
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+# os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 from tensorflow.keras.layers import Embedding, LSTM, Bidirectional, Dense, LSTMCell
 

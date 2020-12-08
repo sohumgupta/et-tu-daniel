@@ -6,46 +6,42 @@ import argparse
 import os
 from os import listdir
 from os.path import isfile, join
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+# os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import io
 
-from preprocess import get_sentences, pad_sentences, vectorize_sentences
+from preprocess import get_sentences, pad_sentences, vectorize_sentences, PAD_TOKEN
 from embeddings import get_embeddings
 from model import Model
 from seq2seq import Seq2Seq
 
 def train(model, train_modern, train_original, padding_index, idx):
-	size = len(train_modern)
+	size = train_modern.shape[0]
 	indices = np.arange(size)
 	shuffled_indices = tf.random.shuffle(indices)
-	train_modern = tf.gather(train_modern, shuffled_indices, None, axis=0, batch_dims=0)
-	train_original = tf.gather(train_original, shuffled_indices, None, axis=0, batch_dims=0)
+	train_modern = train_modern[shuffled_indices]
+	train_original = train_original[shuffled_indices]
 
 	num_batches = size // model.batch_size
-	num_batches = 30
-
+	
 	for i in range(num_batches):
-		batch_inputs = tf.gather(train_modern, indices[i*model.batch_size:(i+1)*model.batch_size], None, axis=0, batch_dims=0)
-		batch_labels = tf.gather(train_original, indices[i*model.batch_size:(i+1)*model.batch_size], None, axis=0, batch_dims=0)
+		batch_inputs = train_modern[i*model.batch_size:(i+1)*model.batch_size]
+		batch_labels = train_original[i*model.batch_size:(i+1)*model.batch_size]
+		
+		batch_inputs = batch_inputs[:, 1:]
 		batch_decoder_inputs = batch_labels[:, :-1]
 		batch_labels = batch_labels[:, 1:]
+
+		# print(f"batch input: {' '.join([idx[x] for x in batch_inputs[0]])}")
+		# print(f"batch decoder inputs: {' '.join([idx[x] for x in batch_decoder_inputs[0]])}")
+		# print(f"batch labels: {' '.join([idx[x] for x in batch_labels[0]])}")
  
 		mask = tf.where(tf.equal(batch_labels, padding_index), tf.zeros(tf.shape(batch_labels)), tf.ones(tf.shape(batch_labels)))
 		with tf.GradientTape() as tape:
 			probs = model.call(batch_inputs, batch_decoder_inputs)
 			loss = model.loss_function(probs, batch_labels, mask)
 
-		probs = tf.reshape(tf.argmax(probs, axis=2), [-1])
-		probs = probs.numpy()
-
-		words_pred = np.array([idx[x] for x in probs], dtype='<U50')
-		sentences_pred = np.reshape(words_pred, batch_decoder_inputs.shape)
-		inputs = tf.reshape(batch_inputs, [-1])
-		inputs = inputs.numpy()
-		input_words = [idx[x] for x in inputs]
-		sentences_input = np.reshape(input_words, batch_inputs.shape)
-		# print(sentences_input[0])
-		# print(sentences_pred[0])
+		# pred_argmax = tf.argmax(probs[0], axis=-1)
+		# print(f"predicted output: {' '.join([idx[x] for x in pred_argmax.numpy()])}")
 		# print()
 
 		if i % 5 == 0:
@@ -55,21 +51,23 @@ def train(model, train_modern, train_original, padding_index, idx):
 	pass
 
 def test(model, test_modern, test_original, idx, padding_index):
-	size = len(test_modern)
+	size = test_modern.shape[0]
 	indices = np.arange(size)
 	shuffled_indices = tf.random.shuffle(indices)
-	test_modern = tf.gather(test_modern, shuffled_indices, None, axis=0, batch_dims=0)
-	test_original = tf.gather(test_original, shuffled_indices, None, axis=0, batch_dims=0)
+	test_modern = test_modern[shuffled_indices]
+	test_original = test_original[shuffled_indices]
 
 	pred_sentences = np.empty((test_modern.shape[0], test_modern.shape[1]-1), dtype='<U50')
-	input_sentences = np.empty((test_modern.shape), dtype='<U50')
+	input_sentences = np.empty((test_modern.shape[0], test_modern.shape[1]-1), dtype='<U50')
 	
 	num_batches = size // model.batch_size
 
 	for i in range(num_batches):
 		print(f"  ↳  Testing batch {i + 1}/{num_batches}")
-		batch_inputs = tf.gather(test_modern, indices[i*model.batch_size:(i+1)*model.batch_size], None, axis=0, batch_dims=0)
-		batch_labels = tf.gather(test_original, indices[i*model.batch_size:(i+1)*model.batch_size], None, axis=0, batch_dims=0)
+		batch_inputs = test_modern[i*model.batch_size:(i+1)*model.batch_size]
+		batch_labels = test_original[i*model.batch_size:(i+1)*model.batch_size]
+
+		batch_inputs = batch_inputs[:, :-1]
 		batch_decoder_inputs = batch_labels[:, :-1]
 		batch_labels = batch_labels[:, 1:]
 
@@ -139,7 +137,7 @@ def preprocess_model(modern_train, original_train, modern_test, original_test, m
 	original_train_idx = vectorize_sentences(vocab, original_train_sentences)
 	original_test_idx = vectorize_sentences(vocab, original_test_sentences)
 
-	return modern_train_idx, modern_test_idx, original_train_idx, original_test_idx, vocab, idx, vocab["*pad*"], embeddings, max_length
+	return modern_train_idx, modern_test_idx, original_train_idx, original_test_idx, vocab, idx, vocab[PAD_TOKEN], embeddings, max_length
 
 def parse_args():
 	parser = argparse.ArgumentParser(description='Shakespearizing Modern English!')
@@ -159,7 +157,10 @@ def main():
 		"../data/test_modern.txt", "../data/test_original.txt", 
 		"../data/valid_modern.txt", "../data/valid_original.txt", 
 		window_size)
-	
+
+	modern_train_idx, original_train_idx = np.array(modern_train_idx), np.array(original_train_idx)
+	original_test_idx, modern_test_idx = np.array(original_test_idx), np.array(modern_test_idx)
+
 	if architecture == 'POINTER':
 		model = Model(embeddings, len(vocab), sentence_length + 2)
 	elif architecture == 'SEQ2SEQ':
@@ -169,10 +170,12 @@ def main():
 	NUM_EPOCHS = 1
 	for e in range(NUM_EPOCHS):
 		print(f"\nTraining Epoch {e+1}/{NUM_EPOCHS}...")
-		train(model, modern_train_idx, original_train_idx, padding_index, idx)
+		# train(model, modern_train_idx, original_train_idx, padding_index, idx)
+		train(model, modern_train_idx, modern_train_idx, padding_index, idx)
 
 	print(f"\nTesting...")
-	bleu_score = test(model, modern_test_idx, original_test_idx, idx, padding_index)
+	# bleu_score = test(model, modern_test_idx, original_test_idx, idx, padding_index)
+	bleu_score = test(model, modern_test_idx, modern_test_idx, idx, padding_index)
 	# print(f"\nBLEU SCORE: {bleu_score}")
 
 if __name__ == '__main__':
