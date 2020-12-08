@@ -30,7 +30,7 @@ class Copy(tf.keras.Model):
 		#call with pointer
 		self.query_weights = Dense(self.hidden_state, use_bias=False, name="query_weights") #dense layer? no bias?
 		self.sentinel_vec = tf.Variable(tf.random.truncated_normal([1, self.hidden_state], stddev=.1), name="sentinel_vec")
-		self.a_bias = tf.Variable(tf.random.truncated_normal([self.window_size, self.window_size + 1], stddev=.1), name="a_bias")    
+		self.a_bias = tf.Variable(tf.random.truncated_normal([self.window_size - 1, self.window_size], stddev=.1), name="a_bias")    
 
 	def build_ptr_prob(self, num_sentences, words_in_sentence, encoder_input, betas):
 		#num_sentences, words_in_sentence
@@ -94,7 +94,7 @@ class Copy(tf.keras.Model):
 		probs = tf.zeros([num_sentences, 0, self.vocab_size])
 
 		#looping for each Decoder iteration
-		for i in range(0, num_words_in_sentence - 1):
+		for i in range(0, num_words_in_sentence):
 			#[num_sentences, self.hidden_state]
 			queries = self.query_weights(final_memory_state_dec)
 			reshaped_queries = tf.reshape(queries, [num_sentences, 1, self.hidden_state]) # [32, 1, 192]
