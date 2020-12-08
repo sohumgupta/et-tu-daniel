@@ -6,15 +6,16 @@ import argparse
 import os
 from os import listdir
 from os.path import isfile, join
-# os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import io
+import subprocess
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 from preprocess import get_sentences, pad_sentences, vectorize_sentences, PAD_TOKEN
 from embeddings import get_embeddings
-from model import Model
+from model import Copy
 from seq2seq import Seq2Seq
 
-def train(model, train_modern, train_original, padding_index, idx):
+def train(model, train_modern, train_original, padding_index):
 	size = train_modern.shape[0]
 	indices = np.arange(size)
 	shuffled_indices = tf.random.shuffle(indices)
@@ -30,19 +31,11 @@ def train(model, train_modern, train_original, padding_index, idx):
 		batch_inputs = batch_inputs[:, 1:]
 		batch_decoder_inputs = batch_labels[:, :-1]
 		batch_labels = batch_labels[:, 1:]
-
-		# print(f"batch input: {' '.join([idx[x] for x in batch_inputs[0]])}")
-		# print(f"batch decoder inputs: {' '.join([idx[x] for x in batch_decoder_inputs[0]])}")
-		# print(f"batch labels: {' '.join([idx[x] for x in batch_labels[0]])}")
  
 		mask = tf.where(tf.equal(batch_labels, padding_index), tf.zeros(tf.shape(batch_labels)), tf.ones(tf.shape(batch_labels)))
 		with tf.GradientTape() as tape:
 			probs = model.call(batch_inputs, batch_decoder_inputs)
 			loss = model.loss_function(probs, batch_labels, mask)
-
-		# pred_argmax = tf.argmax(probs[0], axis=-1)
-		# print(f"predicted output: {' '.join([idx[x] for x in pred_argmax.numpy()])}")
-		# print()
 
 		if i % 5 == 0:
 			print(f"  ↳  Loss for batch {i}/{num_batches}: {loss}")
@@ -87,22 +80,7 @@ def test(model, test_modern, test_original, idx, padding_index):
 	pred_sentences = pred_sentences.tolist()
 	label_sentences = label_sentences.tolist()
 
-	f = open("label_sentences.txt", "a")
-	f.truncate(0)
-	for sentence in label_sentences:
-		sentence_str = " ".join(sentence)
-		f.write(sentence_str + "\n")
-	f.close()
-
-	f = open("pred_sentences.txt", "a")
-	f.truncate(0)
-	for sentence in pred_sentences:
-		sentence_str = " ".join(sentence)
-		f.write(sentence_str + "\n")
-	f.close()
-
-	# bleu_score = model.bleu_score(input_sentences, input_sentences)
-	# return bleu_score
+	return pred_sentences, label_sentences
 
 def preprocess_model(modern_train, original_train, modern_test, original_test, modern_valid, original_valid, window_size=None):
 	"""
@@ -141,11 +119,19 @@ def preprocess_model(modern_train, original_train, modern_test, original_test, m
 
 def parse_args():
 	parser = argparse.ArgumentParser(description='Shakespearizing Modern English!')
-	parser.add_argument('architecture', type=str, help='Model architecture to use (SEQ2SEQ or POINTER)')
+	parser.add_argument('architecture', type=str, help='Model architecture to use (SEQ2SEQ or COPY)')
 	args = parser.parse_args()
-	if (args.architecture not in ['SEQ2SEQ', 'POINTER']):
-		parser.error("Achitecture must be one of SEQ2SEQ or POINTER.")
+	if (args.architecture not in ['SEQ2SEQ', 'COPY']):
+		parser.error("Achitecture must be one of SEQ2SEQ or COPY.")
 	return args
+
+def write_sentences(path, sentences):
+	f = open(path, "a")
+	f.truncate(0)
+	for sentence in sentences:
+		sentence_str = " ".join(sentence)
+		f.write(sentence_str + "\n")
+	f.close()
 
 def main():
 	args = parse_args()
@@ -161,22 +147,28 @@ def main():
 	modern_train_idx, original_train_idx = np.array(modern_train_idx), np.array(original_train_idx)
 	original_test_idx, modern_test_idx = np.array(original_test_idx), np.array(modern_test_idx)
 
-	if architecture == 'POINTER':
-		model = Model(embeddings, len(vocab), sentence_length + 2)
+	if architecture == 'COPY':
+		model = Copy(embeddings, len(vocab), sentence_length + 2)
 	elif architecture == 'SEQ2SEQ':
 		model = Seq2Seq(embeddings, len(vocab), sentence_length + 2)
 
 	# train model
-	NUM_EPOCHS = 15
+	NUM_EPOCHS = 5
 	for e in range(NUM_EPOCHS):
 		print(f"\nTraining Epoch {e+1}/{NUM_EPOCHS}...")
-		train(model, modern_train_idx, original_train_idx, padding_index, idx)
-		# train(model, modern_train_idx, modern_train_idx, padding_index, idx)
+		train(model, modern_train_idx, original_train_idx, padding_index)
 
 	print(f"\nTesting...")
-	bleu_score = test(model, modern_test_idx, original_test_idx, idx, padding_index)
-	# bleu_score = test(model, modern_test_idx, modern_test_idx, idx, padding_index)
-	# print(f"\nBLEU SCORE: {bleu_score}")
+	predictions, labels = test(model, modern_test_idx, original_test_idx, idx, padding_index)
+	print(f"\nCalculating BLEU score...\n")
+
+	results_path = '../results'
+	pred_path = join(results_path, f'pred_sentences.{args.architecture.lower()}.e{NUM_EPOCHS}.txt')
+	labels_path = join(results_path, f'label_sentences.{args.architecture.lower()}.e{NUM_EPOCHS}.txt')
+	write_sentences(pred_path, predictions)
+	write_sentences(labels_path, labels)
+
+	subprocess.call(f"./multi-bleu.perl {labels_path} < {pred_path}", shell=True)
 
 if __name__ == '__main__':
 	main()

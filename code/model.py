@@ -2,13 +2,13 @@ import os
 import numpy as np
 import tensorflow as tf
 from nltk.translate.bleu_score import corpus_bleu
-# os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 from tensorflow.keras.layers import Embedding, LSTM, Bidirectional, Dense, LSTMCell
 
-class Model(tf.keras.Model):
+class Copy(tf.keras.Model):
 	def __init__(self, embeddings, vocab_size, window_size):
-		super(Model, self).__init__()
+		super(Copy, self).__init__()
 
 		#hyperparameters
 		self.batch_size = 100
@@ -20,7 +20,7 @@ class Model(tf.keras.Model):
 
 		#call without pointer
 		self.embedding = Embedding(self.vocab_size, self.embedding_size, embeddings_initializer = tf.keras.initializers.Constant(embeddings), name="embedding_layer")
-		# self.embedding.trainable = False
+		self.embedding.trainable = False
 		self.lstm_layer = LSTM(self.hidden_state, return_sequences=True, return_state=True, name="lstm_layer")
 		self.encoder = Bidirectional(self.lstm_layer, merge_mode='sum', input_shape =(self.batch_size, self.embedding_size), name="encoder")
 		self.decoder_lstm = LSTM(self.hidden_state, return_sequences=True, return_state=True, name="decoder_lstm")

@@ -2,7 +2,7 @@ import os
 import numpy as np
 import tensorflow as tf
 from nltk.translate.bleu_score import corpus_bleu
-# os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 from tensorflow.keras.layers import Embedding, LSTM, Bidirectional, Dense, LSTMCell
 
@@ -20,7 +20,6 @@ class Seq2Seq(tf.keras.Model):
 
 		#model layers
 		self.embedding = Embedding(self.vocab_size, self.embedding_size, embeddings_initializer = tf.keras.initializers.Constant(embeddings), name="embedding_layer")
-		# self.embedding = Embedding(self.vocab_size, self.embedding_size, name="embedding_layer")
 		self.embedding.trainable = False
 		self.lstm_layer = LSTM(self.hidden_state, return_sequences=True, return_state=True, name="lstm_layer")
 		self.encoder = Bidirectional(self.lstm_layer, merge_mode='sum', input_shape=(self.batch_size, self.embedding_size), name="encoder")
@@ -32,7 +31,6 @@ class Seq2Seq(tf.keras.Model):
 		whole_seq_output_enc, final_memory_state_enc_left, final_carry_state_enc_left, final_memory_state_enc_right, final_carry_state_enc_right = self.encoder(inputs=encoder_embeddings, initial_state=None)
 		final_memory_state_enc = final_memory_state_enc_left + final_memory_state_enc_right
 		final_carry_state_enc = final_carry_state_enc_left + final_carry_state_enc_right
-		# whole_seq_output_enc, final_memory_state_enc, final_carry_state_enc = self.lstm_layer(inputs=encoder_embeddings)
 		decoder_embeddings = self.embedding(decoder_input)
 		whole_seq_output, final_memory_state, final_carry_state = self.decoder_lstm(inputs=decoder_embeddings, initial_state=(final_memory_state_enc, final_carry_state_enc))
 		probs = self.dense(whole_seq_output)
