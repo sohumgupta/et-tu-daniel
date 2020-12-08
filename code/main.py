@@ -153,7 +153,7 @@ def main():
 		model = Seq2Seq(embeddings, len(vocab), sentence_length + 2)
 
 	# train model
-	NUM_EPOCHS = 5
+	NUM_EPOCHS = 15
 	for e in range(NUM_EPOCHS):
 		print(f"\nTraining Epoch {e+1}/{NUM_EPOCHS}...")
 		train(model, modern_train_idx, original_train_idx, padding_index)
