@@ -58,7 +58,7 @@ def test(model, test_modern, test_original, idx, padding_index):
 	test_original = test_original[shuffled_indices]
 
 	pred_sentences = np.empty((test_modern.shape[0], test_modern.shape[1]-1), dtype='<U50')
-	input_sentences = np.empty((test_modern.shape[0], test_modern.shape[1]-1), dtype='<U50')
+	label_sentences = np.empty((test_modern.shape[0], test_modern.shape[1]-1), dtype='<U50')
 	
 	num_batches = size // model.batch_size
 
@@ -77,19 +77,19 @@ def test(model, test_modern, test_original, idx, padding_index):
 
 		words_pred = np.array([idx[x] for x in probs], dtype='<U50')
 		sentences_pred = np.reshape(words_pred, batch_decoder_inputs.shape)
-		inputs = tf.reshape(batch_inputs, [-1])
-		inputs = inputs.numpy()
-		input_words = [idx[x] for x in inputs]
-		sentences_input = np.reshape(input_words, batch_inputs.shape)
+		labels = tf.reshape(batch_labels, [-1])
+		labels = labels.numpy()
+		label_words = [idx[x] for x in labels]
+		sentences_label = np.reshape(label_words, batch_labels.shape)
 		pred_sentences[i*model.batch_size:(i+1)*model.batch_size] = sentences_pred
-		input_sentences[i*model.batch_size:(i+1)*model.batch_size] = sentences_input
+		label_sentences[i*model.batch_size:(i+1)*model.batch_size] = sentences_label
 
 	pred_sentences = pred_sentences.tolist()
-	input_sentences = input_sentences.tolist()
+	label_sentences = label_sentences.tolist()
 
-	f = open("input_sentences.txt", "a")
+	f = open("label_sentences.txt", "a")
 	f.truncate(0)
-	for sentence in input_sentences:
+	for sentence in label_sentences:
 		sentence_str = " ".join(sentence)
 		f.write(sentence_str + "\n")
 	f.close()
@@ -167,15 +167,15 @@ def main():
 		model = Seq2Seq(embeddings, len(vocab), sentence_length + 2)
 
 	# train model
-	NUM_EPOCHS = 1
+	NUM_EPOCHS = 15
 	for e in range(NUM_EPOCHS):
 		print(f"\nTraining Epoch {e+1}/{NUM_EPOCHS}...")
-		# train(model, modern_train_idx, original_train_idx, padding_index, idx)
-		train(model, modern_train_idx, modern_train_idx, padding_index, idx)
+		train(model, modern_train_idx, original_train_idx, padding_index, idx)
+		# train(model, modern_train_idx, modern_train_idx, padding_index, idx)
 
 	print(f"\nTesting...")
-	# bleu_score = test(model, modern_test_idx, original_test_idx, idx, padding_index)
-	bleu_score = test(model, modern_test_idx, modern_test_idx, idx, padding_index)
+	bleu_score = test(model, modern_test_idx, original_test_idx, idx, padding_index)
+	# bleu_score = test(model, modern_test_idx, modern_test_idx, idx, padding_index)
 	# print(f"\nBLEU SCORE: {bleu_score}")
 
 if __name__ == '__main__':

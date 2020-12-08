@@ -8,9 +8,9 @@ from word2vec import Word2Vec
 from tqdm import tqdm
 import io
 
-from preprocess import construct_vocab, get_sentences, vectorize_sentences, pad_sentences
+from preprocess import construct_vocab, get_sentences, vectorize_sentences, pad_sentences, PAD_TOKEN
 
-def get_training_data(sentences, vocab_size, negative_samples, window_size):
+def get_training_data(sentences, vocab_size, negative_samples, window_size, pad_token_index):
 	targets, contexts, labels = [], [], []
 
 	sampling_table = tf.keras.preprocessing.sequence.make_sampling_table(vocab_size)
@@ -23,6 +23,8 @@ def get_training_data(sentences, vocab_size, negative_samples, window_size):
 			window_size=window_size,
 			negative_samples=0
 		)
+
+		found_pad = False
 
 		for target, context in positive_examples:
 			context_class = np.reshape(np.array([context]), (-1, 1))
@@ -38,6 +40,10 @@ def get_training_data(sentences, vocab_size, negative_samples, window_size):
 			targets.append(target)
 			contexts.append(example_contexts)
 			labels.append(example_labels)
+
+			if target == pad_token_index:
+				if found_pad: break
+				else: found_pad = True
 
 	return targets, contexts, labels
 
@@ -62,7 +68,8 @@ def train_embeddings(NEGATIVE_SAMPLES, NUM_EPOCHS):
 		sentences=sentence_vectors, 
 		window_size=WINDOW_SIZE, 
 		negative_samples=NEGATIVE_SAMPLES, 
-		vocab_size=VOCAB_SIZE)
+		vocab_size=VOCAB_SIZE,
+		pad_token_index=word2int[PAD_TOKEN])
 	print(f"Number of Training Examples: {len(labels)}")
 
 	BATCH_SIZE = 1000
@@ -117,7 +124,7 @@ def get_embeddings():
 	# Train embeddings if necessary
 	if 'embeddings.tsv' not in listdir(embeddings_path) or 'names.tsv' not in listdir(embeddings_path):
 		print(f"Training word embeddings...")
-		embeddings, word2int, int2word = train_embeddings(1, 1)
+		embeddings, word2int, int2word = train_embeddings(10, 50)
 		write_embeddings(embeddings, word2int, embeddings_path)
 	else:
 		print(f"Word embeddings found.")
